@@ -1,7 +1,9 @@
+import sys
 from pathlib import Path
 
 from faster_whisper import WhisperModel
 
+from common.progress import ProgressReporter
 from . import cache as cache_mod
 from .audio import TempWav, extract_chunk_wav, iter_chunks, probe_duration
 from .silence import detect_silences
@@ -62,20 +64,30 @@ def transcribe(
             return cached  # type: ignore[return-value]
 
     duration = probe_duration(vod_path)
+
+    print(f"[transcribe] loading model '{model_size}' (device={device})...", file=sys.stderr, flush=True)
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
+
+    chunks = list(iter_chunks(duration, chunk_len, overlap))
+    progress = ProgressReporter("transcribe", total=len(chunks))
 
     all_segments: list[TranscriptSegment] = []
     tmp = TempWav()
     try:
-        for idx, start, length in iter_chunks(duration, chunk_len, overlap):
+        for idx, start, length in chunks:
             step_end = start + (chunk_len - overlap) if start + chunk_len < duration else duration
             wav_path = tmp.path(f"chunk_{idx}.wav")
             extract_chunk_wav(vod_path, start, length, wav_path)
             all_segments.extend(_transcribe_chunk(model, wav_path, start, step_end))
+            progress.step(f"chunk covers {start:.0f}s-{start + length:.0f}s of {duration:.0f}s")
     finally:
         tmp.cleanup()
+    progress.finish()
 
+    print("[transcribe] running silence detection...", file=sys.stderr, flush=True)
+    t_sil = ProgressReporter("silence-detect", total=1)
     silences = detect_silences(vod_path)
+    t_sil.finish(f"found {len(silences)} silences")
 
     result: TranscriptResult = {
         "segments": all_segments,

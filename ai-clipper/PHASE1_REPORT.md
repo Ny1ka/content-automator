@@ -20,13 +20,28 @@
 - Real speech (macOS `say` → 2 sentences, ~4.8s) transcribes with plausible word-level
   timestamps and monotonic, non-negative timings.
 
-## What is NOT yet done — the actual spec acceptance test
-The spec's Phase 1 gate requires: **1 VOD with clear speech + 1 with noisy game audio,
-5 spot-checked segments each against real audio (~200ms tolerance), and silence detection
-confirmed against the 3 longest dead-air stretches by ear.** You said you don't have test
-VODs yet, so this hasn't run. Everything above is a mechanics check (the pipeline doesn't
-crash and does roughly the right thing), not the accuracy acceptance test. Drop VOD files
-in `eval/vods/` and I'll run this for real — that's the actual gate before Phase 2.
+## PHASE 1 GATE: PASSED (2026-07-21)
+
+Ran the real acceptance test against `eval/vods/stream_vod_2026-07-18.mp4` (real Twitch
+VOD, 2h8m, `medium` model, ~61 min wall-clock — see judgment call #4 below for the speed
+note this surfaced).
+
+- **Word-timing spot check**: 6 timestamps spread across the VOD (1min, 15min, 30min,
+  70min, 90min, 105min) were checked by the streamer against the real audio — confirmed
+  accurate, including several plausible-looking mishears of gaming slang/names that turned
+  out to be correct once checked by ear.
+- **Silence detection**: confirmed accurate against the actual VOD — the top 5 longest
+  detected silences (30.1s, 24.6s, 21.4s, 17.3s, 14.0s, all in the first ~29 minutes) match
+  real dead air.
+- **One gap in the original spec test as run here**: only one VOD (not the spec's
+  "1 clear-speech + 1 noisy game audio" pair) was available, so this hasn't specifically
+  stress-tested a *separate* noisy-game-audio-only case — this VOD already has game audio
+  bleed throughout, which is likely representative, but flagging that the spec's two-VOD
+  design wasn't followed exactly.
+- Silence threshold was retuned as a direct result of this test — see judgment call #3
+  (updated below), now closed.
+
+Given this, Phase 1 gate is being treated as met and Layer 2 (Analysis) work has started.
 
 ## Judgment calls made (need your input)
 
@@ -44,19 +59,22 @@ in `eval/vods/` and I'll run this for real — that's the actual gate before Pha
    uninterrupted — reasonable for stream commentary, could clip a very long monologue.
    Tune `DEFAULT_CHUNK_LEN` / `DEFAULT_OVERLAP` if you know your VODs skew differently.
 
-3. **Silence detection thresholds: -30dB noise floor, 1.5s minimum duration**
-   (`silence.py`). Untested against real noisy game audio — a stream with loud game audio
-   bleeding through the mic during "dead air" will likely under-detect versus what a human
-   would flag by ear, since the noise floor won't dip to -30dB. This is exactly the
-   parameter the real acceptance test (silences vs. 3 longest audible dead-air stretches)
-   is meant to tune. Expect to lower `noise_db` (make it more negative, e.g. -35 to -40)
-   or raise `min_duration` once real VODs are available.
+3. **RESOLVED — silence detection thresholds.** Original -30dB/1.5s produced 568 silences
+   over 2h8m (median 2.35s, 379 under 3s) — confirmed by the streamer as catching normal
+   speech pauses, not dead air (this VOD had a lower-quality mic, which likely made short
+   pauses register as "silence" more readily). Raised `min_duration` to 6.0s (noise floor
+   left at -30dB, which held up fine); re-run produced 43 silences whose top candidates
+   matched the same real dead-air stretches the streamer already confirmed. This is now a
+   validated default, not a guess — but it came from one VOD, so keep an eye on it as more
+   VODs run through the pipeline.
 
-4. **Model size default: `medium`.** Not benchmarked yet for speed/accuracy tradeoff on
-   real content — `large-v3` would likely transcribe game/stream audio with cross-talk
-   more accurately at a real cost in wall-clock time; `small`/`base` would be much faster
-   for iteration. Worth deciding once you have a sense of how long a 3-hour VOD takes to
-   transcribe on this machine at each size.
+4. **Model size default: `medium`.** Now benchmarked: ~3x realtime on this machine (CPU
+   only, no CUDA), so a 2h8m VOD took ~48 min to transcribe. A 3-4hr VOD would be
+   ~55-75 min — workable but not instant, and this will dominate pipeline wall-clock time
+   more than any other single step. Word-timing accuracy at `medium` was confirmed good
+   by spot check, so no upgrade to `large-v3` seems needed on accuracy grounds, but it
+   would cost real additional time if you want it for a harder case (heavy cross-talk,
+   multiple simultaneous speakers).
 
 5. **Deviation from spec:** the spec's `TranscriptResult` only listed `segments`; I added
    `silences`, `duration`, `vod_path`, and `model_size` fields since the spec's own text
@@ -70,7 +88,14 @@ in `eval/vods/` and I'll run this for real — that's the actual gate before Pha
    multi-hour VODs, where CPU-only transcription will be slow (this is a speed question,
    not a correctness one — no action needed unless throughput becomes a problem).
 
+7. **Progress logging added retroactively** (`common/progress.py`) after you asked for
+   it mid-Phase-1 — the ~48min transcription run that established the Phase 1 gate above
+   predates this and had no incremental progress output (I inferred progress externally
+   by watching temp chunk files). All runs from here on will show per-chunk/per-step
+   progress with ETA.
+
 ## Next step
-Waiting on real VOD files in `eval/vods/` to run the actual accuracy acceptance test
-before starting Layer 2 (analysis prompts). Everything above is ready to point at real
-files as soon as you have them — just tell me the path(s).
+Phase 1 gate passed. Moving to Layer 2 (Analysis) — see `analysis/`, `config/prompts/`,
+`eval/score_segments.py`, `eval/score_clips.py`. Blocked on an `ANTHROPIC_API_KEY`
+(pay-as-you-go, separate from a Claude.ai/Claude Code subscription) to actually run Mode A
+/ Mode B against the real VOD and score against `eval/expected/stream_vod_2026-07-18.json`.

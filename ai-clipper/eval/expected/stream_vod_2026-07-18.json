@@ -1,0 +1,16 @@
+{
+  "vod": "eval/vods/stream_vod_2026-07-18.mp4",
+  "segments": [
+    {"start": 137, "end": 2942, "label": "Fortnite with Friends", "keep": true},
+    {"start": 2942, "end": 3911, "label": "Talking (Riot/Valorant conversation)", "keep": true},
+    {"start": 3911, "end": 7687.42, "label": "Rainbow 6 Siege w/ Friends", "keep": true}
+  ],
+  "segments_note": "0-137s (before 2:17) is unannotated intro/setup and NOT scored — the streamer didn't call it out as a segment, but it does contain the longest detected dead-air stretches, so a good Mode A pass will likely mark part of it keep:false. Don't penalize precision for activity there; use it as a qualitative check instead.",
+  "clips": [
+    {"topic": "OperaGX Browser", "approx_start": 1100, "approx_end": 1185, "type": null},
+    {"topic": "Favorite Fortnite skin", "approx_start": 1780, "approx_end": 2050, "type": null, "note": "spans multiple sub-topics/tangents over ~4.5min, real clip should be a tight sub-window, possibly more than one clip"},
+    {"topic": "Valorant agent ability (the guy who made it)", "approx_start": 3410, "approx_end": 3510, "type": null},
+    {"topic": "Riot Games internships", "approx_start": 3180, "approx_end": 3565, "type": null, "note": "interleaves with the Valorant ability discussion - same conversation, may resolve as one clip or two"}
+  ],
+  "clips_note": "Timestamps here are wide search windows from keyword grep, not exact clip boundaries — a passing Mode A/B run should locate a tighter, non-overlapping window inside each range. This list is NOT exhaustive (only what the streamer named from memory), so it can only be used to score coverage, not precision. Precision requires reviewing every returned candidate."
+}

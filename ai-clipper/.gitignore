@@ -6,3 +6,6 @@ eval/vods/*.wav
 !eval/vods/synthetic_test.wav
 !eval/vods/synthetic_speech.wav
 .DS_Store
+*.mp4
+.env
+.env.*

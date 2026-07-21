@@ -6,12 +6,14 @@ from .types import Silence
 SILENCE_START_RE = re.compile(r"silence_start:\s*([0-9.]+)")
 SILENCE_END_RE = re.compile(r"silence_end:\s*([0-9.]+)")
 
-# Judgment call: -30dB noise floor and 1.5s minimum duration. Loud game audio
-# bleeding through the mic during "silence" will push detected dead air
-# shorter/rarer than a human would flag by ear; tune noise_db down (more
-# negative) if this misses obvious dead air on noisy streams.
+# Judgment call, tuned against a real 2h8m stream VOD on 2026-07-21: -30dB
+# noise floor held up fine (confirmed by ear), but 1.5s min duration caught
+# ordinary speech pauses instead of real dead air (568 silences, median 2.35s,
+# 379 under 3s). Raised to 6s so only genuine dead-air stretches (the
+# streamer confirmed 5 real ones in the 10-30s range) get flagged. Revisit if
+# a future VOD has meaningfully different pacing.
 DEFAULT_NOISE_DB = -30
-DEFAULT_MIN_DURATION = 1.5
+DEFAULT_MIN_DURATION = 6.0
 
 
 def detect_silences(
