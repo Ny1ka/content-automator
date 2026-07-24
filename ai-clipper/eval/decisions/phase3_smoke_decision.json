@@ -1,0 +1,7 @@
+{
+  "segments": [
+    {"start": 0.0, "end": 8.0, "label": "keep A", "keep": true},
+    {"start": 8.0, "end": 16.0, "label": "drop this", "keep": false},
+    {"start": 16.0, "end": 25.0, "label": "keep B", "keep": true}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "vod_path": "/Users/nyikawachira/nyikacode/content-automator/ai-clipper/eval/vods/stream_vod_2026-07-18.mp4",
+  "keep_ranges": [
+    {"start": 0.0, "end": 8.0},
+    {"start": 16.0, "end": 25.0}
+  ]
+}
