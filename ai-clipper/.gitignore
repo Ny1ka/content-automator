@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 eval/cache/
+eval/decisions/*.json
 eval/vods/*.wav
 !eval/vods/synthetic_test.wav
 !eval/vods/synthetic_speech.wav
@@ -9,3 +10,4 @@ eval/vods/*.wav
 *.mp4
 .env
 .env.*
+!.env.example

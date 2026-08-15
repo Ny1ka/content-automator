@@ -34,7 +34,7 @@ OUTPUT
 import json
 import os
 
-DECISION_JSON_PATH = "/Users/nyikawachira/nyikacode/content-automator/ai-clipper/eval/decisions/rainbow6_segment.json"
+DECISION_JSON_PATH = "/path/to/your/decision.json"
 
 
 def fail(msg):

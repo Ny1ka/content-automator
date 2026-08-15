@@ -74,6 +74,36 @@ class ClipsResponse(BaseModel):
     clips: list[Clip]
 
 
+class NamedClip(BaseModel):
+    """Mode C output: one clip located from a natural-language query."""
+    query: str
+    name: str  # short slug for the Resolve timeline name, e.g. "teammate_1hp"
+    found: bool
+    start: float | None = None
+    end: float | None = None
+    reason: str = ""
+
+    @field_validator("end")
+    @classmethod
+    def end_after_start(cls, v, info):
+        start = info.data.get("start")
+        if v is not None and start is not None and v <= start:
+            raise ValueError(f"end ({v}) must be after start ({start})")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def name_is_slug(cls, v):
+        import re
+        if not re.fullmatch(r"[a-z0-9_]+", v):
+            raise ValueError(f"name must be a lowercase_with_underscores slug, got '{v}'")
+        return v
+
+
+class NamedClipsResponse(BaseModel):
+    clips: list[NamedClip]
+
+
 # Flat (no $ref/$defs) tool schemas for providers whose function-calling schema support
 # doesn't handle JSON Schema references (Gemini's does not). Anthropic's tool_use accepts
 # pydantic's model_json_schema() with $defs directly, so it doesn't need these — kept here
@@ -96,6 +126,28 @@ SEGMENTS_SCHEMA_FLAT = {
         },
     },
     "required": ["segments"],
+}
+
+NAMED_CLIPS_SCHEMA_FLAT = {
+    "type": "object",
+    "properties": {
+        "clips": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "name": {"type": "string"},
+                    "found": {"type": "boolean"},
+                    "start": {"type": "number"},
+                    "end": {"type": "number"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["query", "name", "found"],
+            },
+        },
+    },
+    "required": ["clips"],
 }
 
 CLIPS_SCHEMA_FLAT = {

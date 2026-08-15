@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import time
@@ -10,7 +11,7 @@ from common.progress import ProgressReporter
 from . import cache as analysis_cache
 from .anthropic_backend import DEFAULT_ANTHROPIC_MODEL, call_tool_anthropic
 from .gemini_backend import DEFAULT_GEMINI_MODEL, call_tool_gemini
-from .schemas import CLIPS_SCHEMA_FLAT, SEGMENTS_SCHEMA_FLAT, ClipsResponse, SegmentsResponse
+from .schemas import CLIPS_SCHEMA_FLAT, NAMED_CLIPS_SCHEMA_FLAT, SEGMENTS_SCHEMA_FLAT, ClipsResponse, NamedClipsResponse, SegmentsResponse
 from .transcript_format import format_transcript
 
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "config" / "prompts"
@@ -90,6 +91,45 @@ def run_mode_a(
     result = SegmentsResponse.model_validate(raw)
 
     analysis_cache.save(vod_fingerprint, cache_key, result.model_dump())
+    return result
+
+
+def run_mode_c(
+    vod_fingerprint: str,
+    segments: list[dict],
+    queries: list[str],
+    prompt_version: str = "v1",
+    force: bool = False,
+    provider: str | None = None,
+    model: str | None = None,
+) -> NamedClipsResponse:
+    """Locate one clip per natural-language query against the full transcript.
+
+    Unlike Mode A/B, this isn't windowed — a locate-a-specific-moment task
+    benefits from full-transcript context and is a single-shot ask, not an
+    exhaustive scan, so there's no chunking/dedup step here.
+    """
+    provider = _resolve_provider(provider)
+    model = model or _default_model(provider)
+    cache_key = f"mode_c_{prompt_version}_{provider}_{model}"
+    window_key = hashlib.sha256("\n".join(sorted(queries)).encode()).hexdigest()[:16]
+
+    if not force:
+        cached = analysis_cache.load(vod_fingerprint, cache_key, window_key)
+        if cached is not None:
+            return NamedClipsResponse.model_validate(cached)
+
+    prompt_template = (PROMPT_DIR / f"mode_c_find_clips_{prompt_version}.md").read_text()
+    prompt = prompt_template.format(
+        num_queries=len(queries),
+        queries="\n".join(f"{i + 1}. {q}" for i, q in enumerate(queries)),
+        transcript=format_transcript(segments),
+    )
+
+    raw = _call_tool(provider, prompt, "submit_named_clips", NamedClipsResponse, NAMED_CLIPS_SCHEMA_FLAT, model)
+    result = NamedClipsResponse.model_validate(raw)
+
+    analysis_cache.save(vod_fingerprint, cache_key, result.model_dump(), window_key)
     return result
 
 
